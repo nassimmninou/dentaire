@@ -1,0 +1,195 @@
+// App.js
+import React, { useState, useEffect } from "react";
+
+import DocumentUpload from "./ZDocumentUpload";
+
+const App = () => {
+  const [pwList, setPwList] = useState([]);
+  const [newPw, setNewPw] = useState({});
+  const [selectedFile, setSelectedFile] = useState(null);
+
+  const fetchPws = () => {
+    fetch("http://localhost:8080/api/v1/pws")
+      .then((response) => response.json())
+      .then((data) => setPwList(data))
+      .catch((error) =>
+        console.error("Erreur lors de la récupération des PW", error)
+      );
+  };
+
+  useEffect(() => {
+    fetchPws();
+  }, []);
+
+  const handleUpload = () => {
+    fetchPws();
+  };
+
+  const handleFileChange = (e) => {
+    setSelectedFile(e.target.files[0]);
+  };
+
+  const handleNewPwChange = (e) => {
+    setNewPw({
+      ...newPw,
+      [e.target.name]: e.target.value,
+    });
+  };
+
+  const handleAddPw = () => {
+    fetch("http://localhost:8080/api/v1/pws", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(newPw),
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        console.log("Nouveau PW ajouté avec succès", data);
+        setNewPw({});
+        fetchPws();
+      })
+      .catch((error) => {
+        console.error("Erreur lors de l'ajout du PW", error);
+      });
+  };
+
+  return (
+    <div className="container mt-4">
+      <h1>Liste des PW</h1>
+      <table className="table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Title</th>
+            <th>Objective</th>
+            <th>Document Path</th>
+          </tr>
+        </thead>
+        <tbody>
+          {pwList.map((pw) => (
+            <tr key={pw.id}>
+              <td>{pw.id}</td>
+              <td>{pw.title}</td>
+              <td>{pw.objectif}</td>
+              <td>
+                <td>
+                  {pw.docs && (
+                    <a
+                      href={`http://localhost:8080/api/v1/pws/${pw.id}/download`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Download
+                    </a>
+                  )}
+                </td>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <h2>Ajouter un nouveau PW</h2>
+      <div className="mb-3">
+        <label className="form-label">Title:</label>
+        <input
+          type="text"
+          className="form-control"
+          name="title"
+          value={newPw.title || ""}
+          onChange={handleNewPwChange}
+        />
+      </div>
+      <div className="mb-3">
+        <label className="form-label">Objective:</label>
+        <input
+          type="text"
+          className="form-control"
+          name="objectif"
+          value={newPw.objectif || ""}
+          onChange={handleNewPwChange}
+        />
+      </div>
+      <div>
+        <button className="btn btn-primary" onClick={handleAddPw}>
+          Ajouter PW
+        </button>
+      </div>
+
+      <h2>Ajouter un document à un PW existant</h2>
+      <DocumentUpload onUpload={handleUpload} pwList={pwList} />
+    </div>
+  );
+};
+
+export default App;
+import React, { useState } from "react";
+
+const DocumentUpload = ({ onUpload, pwList }) => {
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedPwId, setSelectedPwId] = useState("");
+
+  const handleFileChange = (e) => {
+    setSelectedFile(e.target.files[0]);
+  };
+
+  const handlePwChange = (e) => {
+    setSelectedPwId(e.target.value);
+  };
+
+  const handleUpload = () => {
+    if (!selectedPwId || !selectedFile) {
+      console.error("Veuillez sélectionner un PW et un fichier.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+
+    fetch(`http://localhost:8080/api/v1/pws/${selectedPwId}/upload`, {
+      method: "POST",
+      body: formData,
+    })
+      .then((response) => response.text())
+      .then(() => {
+        console.log("Document uploadé avec succès");
+        onUpload();
+      })
+      .catch((error) => {
+        console.error("Erreur lors de l'upload du document", error);
+      });
+  };
+
+  return (
+    <div className="mb-3">
+      <select
+        className="form-select"
+        value={selectedPwId}
+        onChange={handlePwChange}
+      >
+        <option value="" disabled>
+          Sélectionner un PW
+        </option>
+        {pwList.map((pw) => (
+          <option key={pw.id} value={pw.id}>
+            {pw.title}
+          </option>
+        ))}
+      </select>
+      <input
+        type="file"
+        className="form-control"
+        onChange={handleFileChange}
+        accept=".pdf, .doc, .docx"
+      />
+
+      <button className="btn btn-success" onClick={handleUpload}>
+        Upload Document
+      </button>
+    </div>
+  );
+};
+
+export default DocumentUpload;
